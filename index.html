@@ -147,25 +147,6 @@
   </div>
 </div>
 
-<div id="batchModal" class="modal-overlay hidden">
-  <div class="modal">
-    <h3>Batch edit defaults</h3>
-    <p>Values pre-fill empty fields across selected applicants. Edit per-applicant before saving.</p>
-    <div class="field" style="margin-bottom: 10px;">
-      <label>Training date</label>
-      <input type="date" id="batchDate" />
-    </div>
-    <div class="field" style="margin-bottom: 10px;">
-      <label>Trainer name</label>
-      <input type="text" id="batchTrainer" />
-    </div>
-    <div class="actions">
-      <button class="btn" onclick="closeBatch()">Cancel</button>
-      <button class="btn btn-primary" onclick="startBatch()">Start</button>
-    </div>
-  </div>
-</div>
-
 <script>
 const API_URL = 'https://script.google.com/macros/s/AKfycby-aU5thXJkmqoL6OpwVWGBI_4GHwXQR9tbzSD96Z_XwYe8LmaIcI2CUji7TM7OB5qu/exec';
 
@@ -429,17 +410,9 @@ function renderGrid() {
           '<span class="grade-badge ' + gc + '">' + escapeHtml(String(gradeLabel)) + '</span>' +
         '</div>' +
         '<div class="training-card-body">' +
-          '<div class="field">' +
-            '<label>Training date</label>' +
-            '<input type="date" value="' + escapeAttr(r.date) + '" onchange="updateField(\'' + escapeAttr(cat) + '\',\'date\',this.value)" />' +
-          '</div>' +
-          '<div class="field">' +
+          '<div class="field full">' +
             '<label>Grade (1–100)</label>' +
             '<input type="number" min="1" max="100" step="1" value="' + escapeAttr(r.grade) + '" placeholder="—" oninput="updateField(\'' + escapeAttr(cat) + '\',\'grade\',this.value)" />' +
-          '</div>' +
-          '<div class="field">' +
-            '<label>Trainer</label>' +
-            '<input type="text" value="' + escapeAttr(r.trainer) + '" placeholder="Trainer name" onchange="updateField(\'' + escapeAttr(cat) + '\',\'trainer\',this.value)" />' +
           '</div>' +
           '<div class="field full">' +
             '<label>Note</label>' +
@@ -464,8 +437,12 @@ function updateField(cat, field, val) {
 }
 
 async function submitAll() {
-  const missing = CATEGORIES.filter(c => formData[c].date && !formData[c].grade);
-  if (missing.length) { showToast('Add grade for all dated entries.'); return; }
+  const today = new Date().toISOString().substring(0, 10);
+  CATEGORIES.forEach(c => {
+    if (formData[c].grade !== '' && formData[c].grade !== null && !formData[c].date) {
+      formData[c].date = today;
+    }
+  });
   try {
     showToast('Submitting...');
     await fetch(API_URL, {
@@ -497,24 +474,9 @@ async function submitAll() {
 
 function openBatchEdit() {
   if (selected.size === 0) return;
-  const today = new Date().toISOString().substring(0,10);
-  document.getElementById('batchDate').value = today;
-  document.getElementById('batchTrainer').value = currentTrainer ? currentTrainer.name : '';
-  document.getElementById('batchModal').classList.remove('hidden');
-}
-
-function closeBatch() {
-  document.getElementById('batchModal').classList.add('hidden');
-}
-
-function startBatch() {
-  batchDefaults = {
-    date: document.getElementById('batchDate').value,
-    trainer: document.getElementById('batchTrainer').value
-  };
+  batchDefaults = null;
   batchQueue = Array.from(selected);
-  closeBatch();
-  if (batchQueue.length) openApplicant(batchQueue[0]);
+  openApplicant(batchQueue[0]);
 }
 
 function askClaim(id) {
