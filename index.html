@@ -184,10 +184,23 @@ async function loadData() {
     const data = await res.json();
     trainers = data.trainers || [];
     branches = data.branches || {};
-    applicants = data.applicants || [];
-    records = data.records || {};
+    applicants = [];
+    records = {};
     fillTrainerSelect();
     restoreTrainer();
+  } catch (err) {
+    showToast('Load failed: ' + err.message);
+  }
+}
+
+async function loadApplicantsForTrainer(trainerId) {
+  try {
+    showToast('Loading applicants...');
+    const res = await fetch(API_URL + '?trainer=' + encodeURIComponent(trainerId));
+    const data = await res.json();
+    applicants = data.applicants || [];
+    records = data.records || {};
+    renderApplicants();
   } catch (err) {
     showToast('Load failed: ' + err.message);
   }
@@ -217,19 +230,30 @@ function restoreTrainer() {
 function onTrainerChange() {
   const id = document.getElementById('trainerSelect').value;
   currentTrainer = trainers.find(t => t.id === id) || null;
-  if (currentTrainer) localStorage.setItem('trainerId', currentTrainer.id);
   clearSelection();
-  renderApplicants();
+  if (currentTrainer) {
+    localStorage.setItem('trainerId', currentTrainer.id);
+    loadApplicantsForTrainer(currentTrainer.id);
+  } else {
+    applicants = [];
+    records = {};
+    renderApplicants();
+  }
 }
 
 function trainerBranches(trainerId) {
   return Object.keys(branches).filter(b => branches[b] === trainerId);
 }
 
+const POOL_BRANCHES = ['walk-in', 'direct'];
+function isPoolBranch(b) {
+  return POOL_BRANCHES.indexOf(String(b || '').toLowerCase()) !== -1;
+}
+
 function applicantVisible(a) {
   if (!currentTrainer) return false;
   const myBranches = trainerBranches(currentTrainer.id);
-  return a.Branch === 'walk-in' || myBranches.includes(a.Branch);
+  return isPoolBranch(a.Branch) || myBranches.includes(a.Branch);
 }
 
 function applicantCategoriesTrained(id) {
@@ -260,11 +284,12 @@ function renderApplicants() {
     return;
   }
 
-  const ownedLabel = currentTrainer.name.replace(/^Mam\s+/i,'').trim() + '_walk-in';
+  const nameClean = currentTrainer.name.replace(/^Mam\s+/i,'').trim();
+  const ownedLabels = POOL_BRANCHES.map(p => nameClean + '_' + p);
   const rowsHtml = visible.map(a => {
     const id = a.applicant_id;
-    const isPool = a.Branch === 'walk-in';
-    const isOwned = a.Branch === ownedLabel;
+    const isPool = isPoolBranch(a.Branch);
+    const isOwned = ownedLabels.indexOf(a.Branch) !== -1;
     const chipClass = isPool ? 'chip walkin-pool' : (isOwned ? 'chip walkin-owned' : 'chip');
     const trained = applicantCategoriesTrained(id);
     const claimBtn = isPool ? '<button onclick="event.stopPropagation(); askClaim(\'' + escapeAttr(id) + '\')">Claim</button>' : '';
@@ -482,9 +507,10 @@ function openBatchEdit() {
 function askClaim(id) {
   pendingClaimId = id;
   const a = applicants.find(x => x.applicant_id === id);
-  const label = currentTrainer.name.replace(/^Mam\s+/i,'').trim() + '_walk-in';
+  const pool = String(a.Branch || '').toLowerCase();
+  const label = currentTrainer.name.replace(/^Mam\s+/i,'').trim() + '_' + pool;
   document.getElementById('claimText').textContent =
-    'Claim "' + (a['Full name'] || '') + '" as your walk-in? Branch becomes "' + label + '".';
+    'Claim "' + (a['Full name'] || '') + '" from ' + pool + ' pool? Branch becomes "' + label + '".';
   document.getElementById('claimModal').classList.remove('hidden');
 }
 
