@@ -115,6 +115,14 @@
       </div>
     </div>
     <div id="applicantsContainer"></div>
+    <details style="margin-top: 2rem; color: var(--text-3);">
+      <summary style="cursor:pointer; font-size:12px; text-transform:uppercase; letter-spacing:0.08em;">Admin tools</summary>
+      <div style="display:flex; gap:8px; margin-top:10px; flex-wrap:wrap;">
+        <button class="btn" onclick="adminAction('backfill_ids')">Backfill applicant IDs</button>
+        <button class="btn" onclick="adminAction('install_trigger')">Install form-submit trigger</button>
+        <button class="btn" onclick="adminAction('migrate_branches')">Migrate old branch names</button>
+      </div>
+    </details>
   </section>
 
   <section id="trainingView" class="hidden">
@@ -547,6 +555,28 @@ function showToast(msg) {
   t.classList.add('show');
   clearTimeout(t._h);
   t._h = setTimeout(() => t.classList.remove('show'), 2500);
+}
+
+async function adminAction(action) {
+  try {
+    showToast('Running ' + action + '...');
+    const res = await fetch(API_URL, {
+      method: 'POST',
+      body: JSON.stringify({ action })
+    });
+    const data = await res.json();
+    if (data.ok) {
+      let msg = action + ' done';
+      if (typeof data.count === 'number') msg += ' (' + data.count + ')';
+      if (data.already) msg = action + ' already installed';
+      showToast(msg);
+      if (currentTrainer) loadApplicantsForTrainer(currentTrainer.id);
+    } else {
+      showToast('Failed: ' + (data.error || 'unknown'));
+    }
+  } catch (err) {
+    showToast('Failed: ' + err.message);
+  }
 }
 
 loadData();
